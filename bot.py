@@ -10,7 +10,7 @@ from aiohttp import web
 # === КОНФИГУРАЦИЯ ===
 BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 # ПОКА НЕ МЕНЯЙТЕ! URL мы вставим после деплоя на Render
-WEBHOOK_URL = "https://ВАШ_БОТ.onrender.com"
+WEBHOOK_URL = "https://igadgetgo-bot-zj5l.onrender.com"
 
 CHANNEL_1_URL = os.getenv("CHANNEL_1_URL", "https://t.me/iGadGetGo")
 CHANNEL_2_URL = os.getenv("CHANNEL_2_URL", "https://t.me/iGadgetGo_bot")
