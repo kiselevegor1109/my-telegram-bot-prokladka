@@ -1,6 +1,8 @@
 import asyncio
 import logging
 import os
+import sys
+
 from aiogram import Bot, Dispatcher
 from aiogram.filters import CommandStart
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, Message
@@ -9,15 +11,19 @@ from aiohttp import web
 
 # === КОНФИГУРАЦИЯ ===
 BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
-# ПОКА НЕ МЕНЯЙТЕ! URL мы вставим после деплоя на Render
+if not BOT_TOKEN:
+    print("❌ ОШИБКА: Переменная TELEGRAM_BOT_TOKEN не установлена!")
+    print("👉 Проверьте на Render.com: ваш сервис → Environment → Environment Variables")
+    sys.exit(1)
+
 WEBHOOK_URL = "https://igadgetgo-bot-zj5l.onrender.com"
 
 CHANNEL_1_URL = os.getenv("CHANNEL_1_URL", "https://t.me/iGadGetGo")
 CHANNEL_2_URL = os.getenv("CHANNEL_2_URL", "https://t.me/iGadgetGo_bot")
 
-# === ИНИЦИАЛИЗАЦИЯ ===
-bot = Bot(token=BOT_TOKEN)
-dp = Dispatcher()
+# === ИНИЦИАЛИЗАЦИЯ БУДЕТ В main() ===
+# УБИРАЕМ отсюда: bot = Bot(token=BOT_TOKEN)
+# УБИРАЕМ отсюда: dp = Dispatcher()
 
 # === КЛАВИАТУРА ===
 keyboard = InlineKeyboardMarkup(
@@ -28,7 +34,6 @@ keyboard = InlineKeyboardMarkup(
 )
 
 # === ОБРАБОТЧИКИ ===
-@dp.message(CommandStart())
 async def send_buttons(message: Message):
     user = message.from_user
     logging.info(
@@ -51,42 +56,54 @@ async def send_buttons(message: Message):
         reply_markup=keyboard
     )
 
-# === WEBHOOK НАСТРОЙКИ ===
-async def on_startup(bot: Bot):
-    await bot.set_webhook(f"{WEBHOOK_URL}/webhook")
-
 # === ЗАПУСК ДЛЯ RENDER.COM ===
 async def main():
+    # 1. ИНИЦИАЛИЗАЦИЯ ТОЛЬКО ЗДЕСЬ!
+    bot = Bot(token=BOT_TOKEN)
+    dp = Dispatcher()
+    
+    # 2. Регистрация обработчика
+    dp.message.register(send_buttons, CommandStart())
+    
+    # 3. Настройка логирования
     logging.basicConfig(
         level=logging.INFO,
-        format="%(asctime)s %(levelname)s %(name)s %(message)s",
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     )
     
-    # Настройка вебхука при старте
-    await on_startup(bot)
+    # 4. Настройка вебхука
+    await bot.set_webhook(f"{WEBHOOK_URL}/webhook")
+    logging.info(f"✅ Webhook установлен: {WEBHOOK_URL}/webhook")
     
-    # Создание aiohttp приложения
+    # 5. Создание aiohttp приложения
     app = web.Application()
     webhook_requests_handler = SimpleRequestHandler(
         dispatcher=dp,
         bot=bot,
         secret_token=BOT_TOKEN
     )
-    # Регистрируем путь для вебхука
+    
     webhook_requests_handler.register(app, path="/webhook")
     setup_application(app, dp, bot=bot)
     
-    # Запуск сервера на порту, который предоставляет Render
+    # 6. Запуск сервера
     runner = web.AppRunner(app)
     await runner.setup()
     port = int(os.environ.get("PORT", 10000))
     site = web.TCPSite(runner, "0.0.0.0", port)
     await site.start()
     
-    print(f"Bot started on port {port}. Webhook URL: {WEBHOOK_URL}/webhook")
+    logging.info(f"✅ Бот запущен на порту {port}")
+    logging.info("✅ Бот готов принимать сообщения")
     
-    # Бесконечный цикл
+    # 7. Бесконечный цикл
     await asyncio.Future()
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        print("Бот остановлен")
+    except Exception as e:
+        print(f"❌ Критическая ошибка: {e}")
+        sys.exit(1)
