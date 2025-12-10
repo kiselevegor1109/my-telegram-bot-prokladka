@@ -21,10 +21,6 @@ WEBHOOK_URL = "https://igadgetgo-bot-zj5l.onrender.com"
 CHANNEL_1_URL = os.getenv("CHANNEL_1_URL", "https://t.me/iGadGetGo")
 CHANNEL_2_URL = os.getenv("CHANNEL_2_URL", "https://t.me/iGadgetGo_bot")
 
-# === ИНИЦИАЛИЗАЦИЯ БУДЕТ В main() ===
-# УБИРАЕМ отсюда: bot = Bot(token=BOT_TOKEN)
-# УБИРАЕМ отсюда: dp = Dispatcher()
-
 # === КЛАВИАТУРА ===
 keyboard = InlineKeyboardMarkup(
     inline_keyboard=[
@@ -34,6 +30,7 @@ keyboard = InlineKeyboardMarkup(
 )
 
 # === ОБРАБОТЧИКИ ===
+# ФУНКЦИЯ обработки /start
 async def send_buttons(message: Message):
     user = message.from_user
     logging.info(
@@ -58,11 +55,11 @@ async def send_buttons(message: Message):
 
 # === ЗАПУСК ДЛЯ RENDER.COM ===
 async def main():
-    # 1. ИНИЦИАЛИЗАЦИЯ ТОЛЬКО ЗДЕСЬ!
+    # 1. ИНИЦИАЛИЗАЦИЯ
     bot = Bot(token=BOT_TOKEN)
     dp = Dispatcher()
     
-    # 2. Регистрация обработчика
+    # 2. Регистрация обработчика КОРРЕКТНО
     dp.message.register(send_buttons, CommandStart())
     
     # 3. Настройка логирования
@@ -71,9 +68,20 @@ async def main():
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     )
     
-    # 4. Настройка вебхука
-    await bot.set_webhook(f"{WEBHOOK_URL}/webhook")
-    logging.info(f"✅ Webhook установлен: {WEBHOOK_URL}/webhook")
+    # 4. УДАЛЯЕМ старый вебхук и устанавливаем новый
+    try:
+        await bot.delete_webhook(drop_pending_updates=True)
+        logging.info("✅ Старый вебхук удален")
+        
+        result = await bot.set_webhook(
+            url=f"{WEBHOOK_URL}/webhook",
+            drop_pending_updates=True
+        )
+        logging.info(f"✅ Webhook установлен: {WEBHOOK_URL}/webhook")
+        logging.info(f"✅ Telegram подтвердил: {result}")
+    except Exception as e:
+        logging.error(f"❌ Ошибка вебхука: {e}")
+        # Продолжаем, возможно вебхук уже установлен
     
     # 5. Создание aiohttp приложения
     app = web.Application()
@@ -100,10 +108,13 @@ async def main():
     await asyncio.Future()
 
 if __name__ == "__main__":
+    print("🚀 Запуск бота iGadgetGo...")
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
         print("Бот остановлен")
     except Exception as e:
         print(f"❌ Критическая ошибка: {e}")
+        import traceback
+        traceback.print_exc()
         sys.exit(1)
