@@ -3,7 +3,7 @@ import logging
 import os
 import sys
 
-from aiogram import Bot, Dispatcher
+from aiogram import Bot, Dispatcher, F
 from aiogram.filters import CommandStart
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, Message
 from aiogram.webhook.aiohttp_server import SimpleRequestHandler, setup_application
@@ -29,17 +29,21 @@ keyboard = InlineKeyboardMarkup(
     ]
 )
 
-# === ОБРАБОТЧИКИ ===
-# ФУНКЦИЯ обработки /start
-async def send_buttons(message: Message):
+# === ОБРАБОТЧИК /start КОМАНДЫ ===
+async def handle_start_command(message: Message):
     user = message.from_user
-    logging.info(
-        "User started bot: id=%s username=%s first_name=%s",
-        user.id,
-        user.username,
-        user.first_name,
-    )
-    await message.answer(
+    logging.info(f"🔵 КОМАНДА /start от пользователя: id={user.id}, username={user.username}")
+    await send_welcome_message(message)
+
+# === ОБРАБОТЧИК ТЕКСТА "start" (кнопка) ===
+async def handle_start_text(message: Message):
+    user = message.from_user
+    logging.info(f"🟢 КНОПКА START от пользователя: id={user.id}, username={user.username}")
+    await send_welcome_message(message)
+
+# === ОБЩАЯ ФУНКЦИЯ ПРИВЕТСТВИЯ ===
+async def send_welcome_message(message: Message):
+    welcome_text = (
         "🎉 Добро пожаловать в iGadgetGo!\n\n"
         "У нас вы найдете оригинальные iPhone по выгодным ценам "
         "с полной гарантией качества.\n\n"
@@ -49,9 +53,14 @@ async def send_buttons(message: Message):
         "• Специальных акций и эксклюзивных скидок\n"
         "• Новостей из мира Apple и гаджетов\n"
         "• Акционных предложений только для подписчиков\n\n"
-        "👇 Выберите действие:",
-        reply_markup=keyboard
+        "👇 Выберите действие:"
     )
+    await message.answer(welcome_text, reply_markup=keyboard)
+
+# === ДИАГНОСТИЧЕСКИЙ ОБРАБОТЧИК ===
+async def debug_handler(message: Message):
+    logging.info(f"📊 ДИАГНОСТИКА: text='{message.text}', type={message.content_type}, user={message.from_user.id}")
+    return False  # Продолжаем обработку другими хендлерами
 
 # === ЗАПУСК ДЛЯ RENDER.COM ===
 async def main():
@@ -59,8 +68,13 @@ async def main():
     bot = Bot(token=BOT_TOKEN)
     dp = Dispatcher()
     
-    # 2. Регистрация обработчика КОРРЕКТНО
-    dp.message.register(send_buttons, CommandStart())
+    # 2. Регистрация обработчиков
+    # Команда /start
+    dp.message.register(handle_start_command, CommandStart())
+    # Текст "start" (без слеша) - для кнопки
+    dp.message.register(handle_start_text, F.text.lower() == "start")
+    # Диагностика всех сообщений
+    dp.message.register(debug_handler)
     
     # 3. Настройка логирования
     logging.basicConfig(
@@ -68,7 +82,7 @@ async def main():
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     )
     
-    # 4. УДАЛЯЕМ старый вебхук и устанавливаем новый
+    # 4. Установка вебхука
     try:
         await bot.delete_webhook(drop_pending_updates=True)
         logging.info("✅ Старый вебхук удален")
@@ -81,7 +95,6 @@ async def main():
         logging.info(f"✅ Telegram подтвердил: {result}")
     except Exception as e:
         logging.error(f"❌ Ошибка вебхука: {e}")
-        # Продолжаем, возможно вебхук уже установлен
     
     # 5. Создание aiohttp приложения
     app = web.Application()
@@ -102,7 +115,7 @@ async def main():
     await site.start()
     
     logging.info(f"✅ Бот запущен на порту {port}")
-    logging.info("✅ Бот готов принимать сообщения")
+    logging.info("✅ Ожидаю сообщения...")
     
     # 7. Бесконечный цикл
     await asyncio.Future()
